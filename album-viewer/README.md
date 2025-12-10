@@ -5,9 +5,11 @@ A modern Vue.js 3 application built with TypeScript that displays albums from th
 ## Features
 
 - 🎵 Display album collection in a beautiful grid layout
+- 🛒 Shopping cart functionality with persistent storage
 - 🎨 Modern, responsive design with gradient background
 - 🖼️ Album cover images with hover effects
 - 💰 Price display for each album
+- 🌍 Multi-language support (English, French, German)
 - 📱 Mobile-friendly responsive design
 - ⚡ Built with Vue 3, TypeScript, and Vite
 - 🔧 Full TypeScript support with type safety
@@ -57,6 +59,7 @@ The API should return albums in the following format:
 - `npm run build` - Build for production (with TypeScript compilation)
 - `npm run preview` - Preview production build
 - `npm run type-check` - Run TypeScript type checking without building
+- `npm run test` - Run unit tests with Vitest
 
 ## Project Structure
 
@@ -64,24 +67,36 @@ The API should return albums in the following format:
 album-viewer/
 ├── src/
 │   ├── components/
-│   │   └── AlbumCard.vue    # Individual album card component (TypeScript)
+│   │   ├── AlbumCard.vue      # Individual album card component (TypeScript)
+│   │   ├── CartIcon.vue       # Shopping cart icon with badge
+│   │   └── CartDrawer.vue     # Cart drawer/modal component
+│   ├── stores/
+│   │   └── cart.ts            # Pinia cart store with localStorage
 │   ├── types/
-│   │   └── album.ts         # TypeScript type definitions
-│   ├── App.vue              # Main app component (TypeScript)
-│   └── main.ts              # App entry point (TypeScript)
-├── index.html               # HTML template
-├── vite.config.ts           # Vite configuration (TypeScript)
-├── tsconfig.json            # TypeScript configuration
-├── tsconfig.app.json        # App-specific TypeScript config
-├── env.d.ts                 # Environment type declarations
-└── package.json             # Dependencies and scripts
+│   │   └── album.ts           # TypeScript type definitions
+│   ├── i18n/
+│   │   ├── en.ts              # English translations
+│   │   ├── fr.ts              # French translations
+│   │   └── de.ts              # German translations
+│   ├── App.vue                # Main app component (TypeScript)
+│   └── main.ts                # App entry point (TypeScript)
+├── index.html                 # HTML template
+├── vite.config.ts             # Vite configuration (TypeScript)
+├── vitest.config.ts           # Vitest test configuration
+├── tsconfig.json              # TypeScript configuration
+├── tsconfig.app.json          # App-specific TypeScript config
+├── env.d.ts                   # Environment type declarations
+└── package.json               # Dependencies and scripts
 ```
 
 ## Technologies Used
 
 - Vue 3 (Composition API with `<script setup>`)
 - TypeScript (Static type checking and better developer experience)
+- Pinia (State management for shopping cart)
 - Vite (Build tool with TypeScript support)
+- Vitest (Unit testing framework)
+- Vue I18n (Internationalization support)
 - Axios (HTTP client with TypeScript generics)
 - CSS3 (Grid, Flexbox, Animations)
 
@@ -97,6 +112,17 @@ This application leverages TypeScript for enhanced development experience:
 
 ## Features in Detail
 
+### Shopping Cart
+The app includes a fully functional shopping cart:
+- **Add to Cart**: Click the "Add to Cart" button on any album card to add it to your cart
+- **Cart Icon**: A shopping cart icon in the header displays the number of items in your cart
+- **Cart Drawer**: Click the cart icon to open a slide-out drawer showing all items in your cart
+- **Remove Items**: Each item in the cart can be removed individually
+- **Clear Cart**: Empty your entire cart with a single click
+- **Persistent Storage**: Your cart is saved to localStorage and persists across page refreshes
+- **No Duplicates**: Each album can only be added once to the cart
+- **Visual Feedback**: Buttons show when an album is already in the cart
+
 ### Album Cards
 Each album is displayed in a card with:
 - Album cover image
@@ -107,8 +133,14 @@ Each album is displayed in a card with:
 
 ### Responsive Design
 The app adapts to different screen sizes:
-- Desktop: Multi-column grid layout
-- Mobile: Single column layout with stacked buttons
+- Desktop: Multi-column grid layout with side-by-side controls
+- Mobile: Single column layout with stacked buttons and controls
+
+### Internationalization
+Full multi-language support:
+- Switch between English, French, and German using the language selector
+- All UI elements, including cart labels, are translated
+- Language preference updates instantly across the app
 
 ### Error Handling
 - Loading spinner while fetching data

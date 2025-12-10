@@ -21,20 +21,38 @@
     </div>
     
     <div class="album-actions">
-      <button class="btn btn-primary">{{ $t('albums.addToCart') }}</button>
+      <button 
+        class="btn btn-primary" 
+        @click="handleAddToCart"
+        :disabled="isInCart"
+        :class="{ 'in-cart': isInCart }"
+      >
+        {{ isInCart ? '✓ ' + $t('albums.addToCart') : $t('albums.addToCart') }}
+      </button>
       <button class="btn btn-secondary">{{ $t('albums.preview') }}</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useCartStore } from '../stores/cart'
 import type { Album } from '../types/album'
 
 interface Props {
   album: Album
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
+const cartStore = useCartStore()
+
+const isInCart = computed(() => cartStore.has(props.album.id))
+
+const handleAddToCart = (): void => {
+  if (!isInCart.value) {
+    cartStore.add(props.album)
+  }
+}
 
 const handleImageError = (event: Event): void => {
   const target = event.target as HTMLImageElement
@@ -162,9 +180,23 @@ const handleImageError = (event: Event): void => {
   color: white;
 }
 
-.btn-primary:hover {
+.btn-primary:hover:not(:disabled) {
   background: #5a6fd8;
   transform: translateY(-2px);
+}
+
+.btn-primary:disabled {
+  background: #a0a0a0;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.btn-primary.in-cart {
+  background: #28a745;
+}
+
+.btn-primary.in-cart:hover {
+  background: #218838;
 }
 
 .btn-secondary {

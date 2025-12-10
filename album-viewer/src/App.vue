@@ -3,13 +3,16 @@
     <header class="header">
       <h1>{{ $t('app.title') }}</h1>
       <p>{{ $t('albums.header') }}</p>
-      <div class="lang-select">
-        <label for="lang">{{ $t('app.language') }}:</label>
-        <select id="lang" v-model="locale" @change="onChangeLocale">
-          <option value="en">{{ $t('app.english') }}</option>
-          <option value="fr">{{ $t('app.french') }}</option>
-          <option value="de">{{ $t('app.german') }}</option>
-        </select>
+      <div class="header-controls">
+        <div class="lang-select">
+          <label for="lang">{{ $t('app.language') }}:</label>
+          <select id="lang" v-model="locale" @change="onChangeLocale">
+            <option value="en">{{ $t('app.english') }}</option>
+            <option value="fr">{{ $t('app.french') }}</option>
+            <option value="de">{{ $t('app.german') }}</option>
+          </select>
+        </div>
+        <CartIcon :count="cartStore.count" @toggle="toggleCart" />
       </div>
     </header>
 
@@ -32,6 +35,14 @@
         />
       </div>
     </main>
+
+    <CartDrawer 
+      :is-open="isCartOpen"
+      :items="cartStore.items"
+      @close="toggleCart"
+      @remove="cartStore.remove"
+      @clear="cartStore.clear"
+    />
   </div>
 </template>
 
@@ -40,12 +51,21 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import axios from 'axios'
 import AlbumCard from './components/AlbumCard.vue'
+import CartIcon from './components/CartIcon.vue'
+import CartDrawer from './components/CartDrawer.vue'
+import { useCartStore } from './stores/cart'
 import type { Album } from './types/album'
 
 const albums = ref<Album[]>([])
 const loading = ref<boolean>(true)
 const error = ref<string | null>(null)
 const { locale } = useI18n()
+const cartStore = useCartStore()
+const isCartOpen = ref<boolean>(false)
+
+const toggleCart = (): void => {
+  isCartOpen.value = !isCartOpen.value
+}
 
 const onChangeLocale = () => {
   // locale is reactive via v-model
@@ -66,6 +86,7 @@ const fetchAlbums = async (): Promise<void> => {
 }
 
 onMounted(() => {
+  cartStore.loadFromStorage()
   fetchAlbums()
 })
 </script>
@@ -91,6 +112,20 @@ onMounted(() => {
 .header p {
   font-size: 1.2rem;
   opacity: 0.9;
+}
+
+.header-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.lang-select {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .main {
@@ -156,6 +191,27 @@ onMounted(() => {
   padding: 1rem;
 }
 
+.lang-select select {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 2px solid white;
+  padding: 0.5rem 1rem;
+  border-radius: 25px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.lang-select select:hover {
+  background: white;
+  color: #667eea;
+}
+
+.lang-select select option {
+  background: #667eea;
+  color: white;
+}
+
 @media (max-width: 768px) {
   .app {
     padding: 1rem;
@@ -163,6 +219,11 @@ onMounted(() => {
   
   .header h1 {
     font-size: 2rem;
+  }
+
+  .header-controls {
+    flex-direction: column;
+    gap: 1rem;
   }
   
   .albums-grid {
