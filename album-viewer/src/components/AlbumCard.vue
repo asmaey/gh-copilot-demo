@@ -21,8 +21,8 @@
     </div>
     
     <div class="album-actions">
-      <button class="btn btn-primary">Add to Cart</button>
-      <button class="btn btn-secondary">Preview</button>
+      <button class="btn btn-primary">{{ $t('albums.addToCart') }}</button>
+      <button class="btn btn-secondary">{{ $t('albums.preview') }}</button>
     </div>
   </div>
 </template>
