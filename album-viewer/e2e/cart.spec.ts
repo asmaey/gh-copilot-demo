@@ -68,7 +68,7 @@ test.describe('Cart Management', () => {
     // Add two items
     const addButtons = page.locator('.album-card .btn-primary')
     await addButtons.nth(0).click()
-    await page.waitForTimeout(500)
+    await expect(page.locator('.badge')).toHaveText('1')
     await addButtons.nth(1).click()
     
     // Wait for badge to update
@@ -119,7 +119,7 @@ test.describe('Cart Management', () => {
     // Add two items
     const addButtons = page.locator('.album-card .btn-primary')
     await addButtons.nth(0).click()
-    await page.waitForTimeout(500)
+    await expect(page.locator('.badge')).toHaveText('1')
     await addButtons.nth(1).click()
     
     // Open cart drawer

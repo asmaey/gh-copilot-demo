@@ -14,7 +14,8 @@ const i18n = createI18n({
         empty: 'Your cart is empty',
         items: 'Items',
         remove: 'Remove',
-        clear: 'Clear Cart'
+        clear: 'Clear Cart',
+        close: 'Close Cart'
       }
     }
   }

@@ -16,6 +16,7 @@ export default {
   cart: {
     title: "Shopping Cart",
     open: "Open Cart",
+    close: "Close Cart",
     items: "Items",
     empty: "Your cart is empty",
     add: "Add to Cart",

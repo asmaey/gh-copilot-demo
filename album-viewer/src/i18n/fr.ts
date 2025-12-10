@@ -16,6 +16,7 @@ export default {
   cart: {
     title: "Panier",
     open: "Ouvrir le panier",
+    close: "Fermer le panier",
     items: "Articles",
     empty: "Votre panier est vide",
     add: "Ajouter au panier",

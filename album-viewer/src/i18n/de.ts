@@ -16,6 +16,7 @@ export default {
   cart: {
     title: "Warenkorb",
     open: "Warenkorb öffnen",
+    close: "Warenkorb schließen",
     items: "Artikel",
     empty: "Ihr Warenkorb ist leer",
     add: "In den Warenkorb",
