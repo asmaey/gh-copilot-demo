@@ -1,0 +1,27 @@
+############################################
+## EXAMPLE terraform.tfvars               ##
+## Copy to terraform.tfvars and edit      ##
+############################################
+
+# Azure region for all resources
+location = "eastus"
+
+# Resource group name
+resource_group_name = "rg-container-apps"
+
+# Container Apps environment name
+container_apps_env_name = "env-container-apps"
+
+# Log Analytics workspace name
+log_analytics_workspace_name = "log-container-apps"
+
+# ---- Azure Container Registry ----
+
+# Globally unique, lowercase alphanumeric (no hyphens)
+registry_name = "myuniqueacr"
+
+# ---- Container images ----
+
+# Tagged with the commit SHA by the deploy workflow (e.g. myuniqueacr.azurecr.io/albums-api:abc1234)
+albums_api_image = "myuniqueacr.azurecr.io/albums-api:latest"
+album_viewer_image = "myuniqueacr.azurecr.io/album-viewer:latest"

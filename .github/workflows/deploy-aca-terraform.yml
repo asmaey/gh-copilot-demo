@@ -1,0 +1,210 @@
+name: Deploy To Azure Container Apps (Terraform)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - ".vscode/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: iac/terraform
+
+jobs:
+  validate-config:
+    name: Validate Secrets & Variables
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets and variables
+        run: |
+          missing=()
+          [ -z "${{ secrets.AZURE_CLIENT_ID }}" ]       && missing+=("AZURE_CLIENT_ID")
+          [ -z "${{ secrets.AZURE_TENANT_ID }}" ]       && missing+=("AZURE_TENANT_ID")
+          [ -z "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ] && missing+=("AZURE_SUBSCRIPTION_ID")
+          [ -z "${{ vars.ACR_NAME }}" ]                 && missing+=("ACR_NAME (variable)")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required configuration: ${missing[*]}"
+            exit 1
+          fi
+          echo "All required secrets and variables are present."
+
+  deploy:
+    name: Build, Push & Deploy
+    needs: validate-config
+    runs-on: ubuntu-latest
+    environment: aca-demo
+    outputs:
+      albums_api_fqdn: ${{ steps.tf-output.outputs.albums_api_fqdn }}
+      album_viewer_fqdn: ${{ steps.tf-output.outputs.album_viewer_fqdn }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Azure OIDC Login ──────────────────────────────────────────────────
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # ── Infrastructure bootstrap ──────────────────────────────────────────
+      - name: Bootstrap Resource Group
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az group create \
+              --name "${{ vars.AZURE_RESOURCE_GROUP || 'rg-container-apps' }}" \
+              --location "eastus" \
+              --output none
+
+      - name: Bootstrap ACR
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            RG="${{ vars.AZURE_RESOURCE_GROUP || 'rg-container-apps' }}"
+            ACR="${{ vars.ACR_NAME }}"
+            if ! az acr show --name "$ACR" --resource-group "$RG" --output none 2>/dev/null; then
+              az acr create \
+                --name "$ACR" \
+                --resource-group "$RG" \
+                --sku Basic \
+                --admin-enabled true \
+                --output none
+            else
+              echo "ACR '$ACR' already exists, skipping creation."
+            fi
+
+      # ── Build & push images ───────────────────────────────────────────────
+      - name: Set image tags
+        id: tags
+        run: |
+          SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          ACR="${{ vars.ACR_NAME }}"
+          echo "sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "api_image=${ACR}.azurecr.io/albums-api:${SHA}" >> "$GITHUB_OUTPUT"
+          echo "viewer_image=${ACR}.azurecr.io/album-viewer:${SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Build & push albums-api image
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az acr build \
+              --registry "${{ vars.ACR_NAME }}" \
+              --image "albums-api:${{ steps.tags.outputs.sha }}" \
+              --file albums-api/Dockerfile \
+              albums-api
+
+      - name: Build & push album-viewer image
+        uses: azure/CLI@v2
+        with:
+          inlineScript: |
+            az acr build \
+              --registry "${{ vars.ACR_NAME }}" \
+              --image "album-viewer:${{ steps.tags.outputs.sha }}" \
+              --file album-viewer/Dockerfile \
+              album-viewer
+
+      # ── Terraform ─────────────────────────────────────────────────────────
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.3"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var="registry_name=${{ vars.ACR_NAME }}" \
+            -var="resource_group_name=${{ vars.AZURE_RESOURCE_GROUP || 'rg-container-apps' }}" \
+            -var="container_apps_env_name=${{ vars.CONTAINER_APPS_ENV_NAME || 'env-container-apps' }}" \
+            -var="log_analytics_workspace_name=${{ vars.LOG_ANALYTICS_WORKSPACE_NAME || 'log-container-apps' }}" \
+            -var="albums_api_image=${{ steps.tags.outputs.api_image }}" \
+            -var="album_viewer_image=${{ steps.tags.outputs.viewer_image }}" \
+            -out=tfplan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+
+      - name: Capture Terraform outputs
+        id: tf-output
+        run: |
+          echo "albums_api_fqdn=$(terraform output -raw albums_api_fqdn)" >> "$GITHUB_OUTPUT"
+          echo "album_viewer_fqdn=$(terraform output -raw album_viewer_fqdn)" >> "$GITHUB_OUTPUT"
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+
+      # ── Smoke tests ───────────────────────────────────────────────────────
+      - name: Smoke test — albums API
+        run: |
+          API_URL="https://${{ steps.tf-output.outputs.albums_api_fqdn }}/albums"
+          echo "Checking $API_URL …"
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL" --max-time 10 || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "albums-api returned HTTP 200 ✓"
+              break
+            fi
+            echo "Attempt $i: got $STATUS, retrying in 15s…"
+            sleep 15
+          done
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::albums-api smoke test failed (last status: $STATUS)"
+            exit 1
+          fi
+
+      - name: Smoke test — album viewer
+        run: |
+          VIEWER_URL="https://${{ steps.tf-output.outputs.album_viewer_fqdn }}"
+          echo "Checking $VIEWER_URL …"
+          for i in $(seq 1 10); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$VIEWER_URL" --max-time 10 || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "album-viewer returned HTTP 200 ✓"
+              break
+            fi
+            echo "Attempt $i: got $STATUS, retrying in 15s…"
+            sleep 15
+          done
+          if [ "$STATUS" != "200" ]; then
+            echo "::error::album-viewer smoke test failed (last status: $STATUS)"
+            exit 1
+          fi
+
+      # ── Deployment summary ────────────────────────────────────────────────
+      - name: Deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | URL |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|-----|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| albums-api | [https://${{ steps.tf-output.outputs.albums_api_fqdn }}/albums](https://${{ steps.tf-output.outputs.albums_api_fqdn }}/albums) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| album-viewer | [https://${{ steps.tf-output.outputs.album_viewer_fqdn }}](https://${{ steps.tf-output.outputs.album_viewer_fqdn }}) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Image tag:** \`${{ steps.tags.outputs.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
