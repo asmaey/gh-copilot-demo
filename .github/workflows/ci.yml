@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - ".vscode/**"
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - "README.md"
+      - ".vscode/**"
+
+jobs:
+  build-api:
+    name: Build albums-api (.NET 8)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore dependencies
+        run: dotnet restore
+        working-directory: albums-api
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+        working-directory: albums-api
+
+  build-viewer:
+    name: Build album-viewer (Vue 3)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: album-viewer/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: album-viewer
+
+      - name: Build
+        run: npm run build
+        working-directory: album-viewer
+
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.3"
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: iac/terraform
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: iac/terraform
